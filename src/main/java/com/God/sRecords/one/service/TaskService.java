@@ -41,7 +41,7 @@ public class TaskService {
         return taskRepository.findByUserId(user.getId());
     }
 
-    public Optional<Task> currrentTask(Long id, User user){
+    public Optional<Task> currentTask(Long id, User user){
         Optional<Task> task = taskRepository.findById(id)
                 .filter(t -> t.getUser().getId().equals(user.getId()));;
 

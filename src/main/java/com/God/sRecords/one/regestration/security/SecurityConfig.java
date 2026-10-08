@@ -22,12 +22,9 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.ignoringRequestMatchers("/api/auth/**"))
                 .authorizeHttpRequests(auth -> auth
-                        // Статика и публичные страницы
                         .requestMatchers("/", "/register", "/login", "/css/**", "/js/**").permitAll()
-                        // REST-эндпоинты аутентификации
                         .requestMatchers("/api/auth/**").permitAll()
-                        // Всё остальное — только для залогиненных
-                        .anyRequest().authenticated()   // ⬅️ ВСЕГДА последним
+                        .anyRequest().authenticated()
                 )
                 .formLogin(form -> form
                         .loginPage("/login")

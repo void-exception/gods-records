@@ -30,14 +30,4 @@ public class PageController {
     public String current() {
         return "current";
     }
-
-    @GetMapping("/trash")
-    public String trashPage() {
-        return "home";
-    }
-
-    @GetMapping("/arhiv")
-    public String arhivPage() {
-        return "arhiv";
-    }
 }

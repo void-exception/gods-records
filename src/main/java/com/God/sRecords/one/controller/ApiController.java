@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api")
@@ -63,7 +62,6 @@ public class ApiController {
             @AuthenticationPrincipal User user,
             @PathVariable Long id
     ){
-        Task task = taskService.currrentTask(id, user)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         return ResponseEntity.ok().body(TaskDto.from(task));
     }
@@ -73,7 +71,7 @@ public class ApiController {
             @AuthenticationPrincipal User user,
             @RequestParam("type") TypeTask type
             ){
-        
+
         List<TaskDto> tasks = taskService.tasksType(user, type).stream()
                 .map(TaskDto::from)
                 .toList();
