@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <title>Заметка</title>
+
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+
+    <style>
+        body { font-family: sans-serif; max-width: 700px; margin: 40px auto; padding: 20px; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; }
+        h1 { margin: 20px 0 10px; }
+        .meta { color: #666; font-size: 13px; margin-bottom: 16px; }
+        .body { white-space: pre-wrap; line-height: 1.5; margin-bottom: 20px; }
+        label { display: block; margin-top: 12px; font-size: 14px; color: #333; }
+        input[type=text], textarea, select {
+            width: 100%; padding: 8px; box-sizing: border-box; margin-top: 4px;
+        }
+        textarea { min-height: 150px; }
+        .actions { margin-top: 20px; display: flex; gap: 8px; flex-wrap: wrap; }
+        .actions button { padding: 8px 16px; cursor: pointer; }
+        #error { color: #c00; margin-top: 12px; }
+        #success { color: #080; margin-top: 12px; }
+    </style>
+</head>
+<body>
+
+<div class="topbar">
+    <div><a th:href="@{/tasks}">← К списку</a></div>
+</div>
+
+<h1 id="title">Загрузка…</h1>
+<div class="meta">
+    Тип: <span id="type">?</span> ·
+    Создано: <span id="createdAt">?</span> ·
+    Изменено: <span id="updatedAt">?</span>
+</div>
+
+<div class="body" id="body"></div>
+
+<hr/>
+
+<h3>Редактировать</h3>
+
+<form id="editForm">
+    <label for="name">Заголовок</label>
+    <input type="text" id="name" required />
+
+    <label for="bodyInput">Текст</label>
+    <textarea id="bodyInput"></textarea>
+
+    <label for="typeInput">Тип</label>
+    <select id="typeInput">
+        <option value="NORMAL">Обычная</option>
+        <option value="ARCHIVED">Архив</option>
+        <option value="TRASH">Корзина</option>
+    </select>
+
+    <div class="actions">
+        <button type="submit">Сохранить</button>
+    </div>
+
+    <div id="error"></div>
+    <div id="success"></div>
+</form>
+
+<script>
+    const csrfToken  = document.querySelector('meta[name="_csrf"]').content;
+    const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+
+    // ⬇️ id парсим прямо из URL: /task/42 → 42
+    const pathParts = window.location.pathname.split('/');
+    const taskId = pathParts[pathParts.length - 1];
+
+    const errorBox   = document.getElementById('error');
+    const successBox = document.getElementById('success');
+
+    // ====== Загрузка через REST ======
+    async function loadTask() {
+        const res = await fetch('/api/task/' + taskId);
+
+        if (res.status === 404) {
+            document.getElementById('title').textContent = 'Заметка не найдена';
+            document.getElementById('editForm').style.display = 'none';
+            return;
+        }
+        if (!res.ok) {
+            errorBox.textContent = 'Ошибка загрузки: ' + res.status;
+            return;
+        }
+
+        const t = await res.json();
+
+        document.getElementById('title').textContent = t.name;
+        document.getElementById('type').textContent = t.type;
+        document.getElementById('createdAt').textContent = new Date(t.createdAt).toLocaleString('ru-RU');
+        document.getElementById('updatedAt').textContent = new Date(t.updatedAt).toLocaleString('ru-RU');
+        document.getElementById('body').textContent = t.body ?? '';
+
+        document.getElementById('name').value = t.name;
+        document.getElementById('bodyInput').value = t.body ?? '';
+        document.getElementById('typeInput').value = t.type;
+    }
+
+    // ====== Сохранение через REST ======
+    document.getElementById('editForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errorBox.textContent = '';
+        successBox.textContent = '';
+
+        const params = new URLSearchParams({
+            name: document.getElementById('name').value,
+            body: document.getElementById('bodyInput').value,
+            type: document.getElementById('typeInput').value
+        });
+
+        const res = await fetch('/api/update/' + taskId + '?' + params, {
+            method: 'PUT',
+            headers: { [csrfHeader]: csrfToken }
+        });
+
+        if (res.ok) {
+            successBox.textContent = 'Сохранено';
+            loadTask();
+        } else {
+            errorBox.textContent = 'Не удалось сохранить: ' + res.status;
+        }
+    });
+
+    loadTask();
+</script>
+
+</body>
+</html>

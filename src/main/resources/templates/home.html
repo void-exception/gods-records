@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <title>Мои заметки</title>
+
+    <!-- CSRF-токен для fetch -->
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; }
+        .tabs { margin: 20px 0; }
+        .tabs button { margin-right: 8px; padding: 6px 12px; cursor: pointer; }
+        .tabs button.active { font-weight: bold; background: #ddd; }
+        form.create { margin: 20px 0; display: flex; gap: 8px; flex-wrap: wrap; }
+        form.create input, form.create textarea { padding: 6px; }
+        form.create textarea { flex: 1; min-width: 200px; }
+        ul { list-style: none; padding: 0; }
+        li { border: 1px solid #ddd; padding: 10px; margin-bottom: 8px; border-radius: 6px; }
+        li h3 { margin: 0 0 6px; }
+        li .actions { margin-top: 8px; }
+        li .actions button { margin-right: 6px; cursor: pointer; }
+        .muted { color: #888; font-size: 12px; }
+    </style>
+</head>
+<body>
+
+<div class="topbar">
+    <div>Привет, <span sec:authentication="name">user</span>!</div>
+    <form th:action="@{/logout}" method="post">
+        <button type="submit">Выйти</button>
+    </form>
+</div>
+
+<h1>Мои заметки</h1>
+
+<!-- Форма создания -->
+<form class="create" id="createForm">
+    <input type="text" id="name" placeholder="Заголовок" required />
+    <textarea id="body" placeholder="Текст" rows="1"></textarea>
+    <button type="submit">Создать</button>
+</form>
+
+<!-- Табы -->
+<div class="tabs">
+    <button data-type="NORMAL" class="active">Обычные</button>
+    <button data-type="ARCHIVED">Архив</button>
+    <button data-type="TRASH">Корзина</button>
+    <button id="clearTrashBtn" style="float:right; background:#fcc;">Очистить корзину</button>
+</div>
+
+<ul id="tasksList"></ul>
+<p id="emptyMsg" class="muted" style="display:none;">Заметок нет</p>
+
+<script>
+    const csrfToken  = document.querySelector('meta[name="_csrf"]').content;
+    const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+
+    let currentType = 'NORMAL';
+
+    // ====== Загрузка списка ======
+    async function loadTasks() {
+        const res = await fetch('/api/all/type?type=' + currentType);
+        if (!res.ok) { console.error('Ошибка загрузки', res.status); return; }
+        const tasks = await res.json();
+
+        const list = document.getElementById('tasksList');
+        const empty = document.getElementById('emptyMsg');
+        list.innerHTML = '';
+
+        if (tasks.length === 0) {
+            empty.style.display = 'block';
+            return;
+        }
+        empty.style.display = 'none';
+
+        tasks.forEach(t => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <h3><a href="/task/${t.id}">${escapeHtml(t.name)}</a></h3>
+                <p>${escapeHtml(t.body ?? '')}</p>
+                <small class="muted">
+                    Тип: ${t.type} · Создано: ${new Date(t.createdAt).toLocaleString('ru-RU')}
+                </small>
+                <div class="actions">
+                    ${currentType !== 'NORMAL'   ? `<button data-to="NORMAL">Восстановить</button>` : ''}
+                    ${currentType !== 'ARCHIVED' ? `<button data-to="ARCHIVED">В архив</button>` : ''}
+                    ${currentType !== 'TRASH'    ? `<button data-to="TRASH">В корзину</button>` : ''}
+                </div>
+            `;
+            // обработчики кнопок смены типа
+            li.querySelectorAll('button[data-to]').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    await changeType(t, btn.dataset.to);
+                });
+            });
+            list.appendChild(li);
+        });
+    }
+
+    // ====== Создание ======
+    document.getElementById('createForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('name').value;
+        const body = document.getElementById('body').value;
+
+        const params = new URLSearchParams({ name, body });
+        const res = await fetch('/api/create?' + params, {
+            method: 'POST',
+            headers: { [csrfHeader]: csrfToken }
+        });
+
+        if (res.status === 201) {
+            document.getElementById('name').value = '';
+            document.getElementById('body').value = '';
+            if (currentType !== 'NORMAL') {
+                currentType = 'NORMAL';
+                highlightTab();
+            }
+            loadTasks();
+        } else {
+            alert('Не удалось создать: ' + res.status);
+        }
+    });
+
+    // ====== Смена типа ======
+    async function changeType(task, newType) {
+        const params = new URLSearchParams({
+            name: task.name,
+            body: task.body ?? '',
+            type: newType
+        });
+        const res = await fetch('/api/update/' + task.id + '?' + params, {
+            method: 'PUT',
+            headers: { [csrfHeader]: csrfToken }
+        });
+        if (res.ok) loadTasks();
+        else alert('Не удалось изменить: ' + res.status);
+    }
+
+    // ====== Очистка корзины ======
+    document.getElementById('clearTrashBtn').addEventListener('click', async () => {
+        if (!confirm('Очистить корзину полностью? Это удалит все заметки из корзины.')) return;
+        const res = await fetch('/api/delete', {
+            method: 'DELETE',
+            headers: { [csrfHeader]: csrfToken }
+        });
+        if (res.status === 204) {
+            if (currentType === 'TRASH') loadTasks();
+            alert('Корзина очищена');
+        } else {
+            alert('Не удалось очистить: ' + res.status);
+        }
+    });
+
+    // ====== Табы ======
+    document.querySelectorAll('.tabs button[data-type]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            currentType = btn.dataset.type;
+            highlightTab();
+            loadTasks();
+        });
+    });
+
+    function highlightTab() {
+        document.querySelectorAll('.tabs button[data-type]').forEach(b => {
+            b.classList.toggle('active', b.dataset.type === currentType);
+        });
+    }
+
+    // ====== Утилита экранирования (чтобы не сломать HTML) ======
+    function escapeHtml(s) {
+        return String(s)
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
+    }
+
+    // ====== Старт ======
+    loadTasks();
+</script>
+
+</body>
+</html>
