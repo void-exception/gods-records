@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Регистрация</title>
+
+    <!-- CSRF-токен на случай, если отключение CSRF для /api/auth/** не сработает -->
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+
+    <style>
+        :root {
+            --bg-dark: #1b3322;
+            --panel-bg: #23442d;
+            --input-bg: #d2d2d2;
+            --text-color: #ffffff;
+            --text-muted: #a0b0a0;
+            --btn-bg: #24352a;
+            --btn-hover: #2f4537;
+        }
+
+        body { 
+            font-family: Arial, sans-serif; 
+            background-color: var(--bg-dark); 
+            color: var(--text-color);
+            margin: 0; 
+            padding: 20px; 
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .login-container {
+            background-color: var(--panel-bg);
+            padding: 40px 30px;
+            border-radius: 24px;
+            text-align: center;
+            width: 360px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            box-sizing: border-box;
+        }
+
+        .login-container h1 { 
+            margin: 0 0 25px 0; 
+            font-size: 32px;
+            font-weight: normal;
+            font-family: 'Times New Roman', Times, serif;
+        }
+
+        .input-group {
+            margin-bottom: 16px;
+            text-align: left;
+        }
+
+        .input-field { 
+            width: 100%; 
+            padding: 12px 16px; 
+            box-sizing: border-box; 
+            border: none;
+            border-radius: 12px;
+            background-color: var(--input-bg);
+            color: #111111;
+            font-size: 16px;
+            font-family: 'Times New Roman', Times, serif;
+        }
+
+        .input-field::placeholder {
+            color: #555555;
+        }
+
+        .input-field:focus {
+            outline: 2px solid #5a8a68;
+        }
+
+        .hint {
+            display: block;
+            color: var(--text-muted);
+            font-size: 11px;
+            margin-top: 5px;
+            padding: 0 4px;
+            line-height: 1.3;
+            font-family: 'Times New Roman', Times, serif;
+        }
+
+        .submit-btn { 
+            background-color: var(--btn-bg);
+            color: var(--text-color);
+            border: none;
+            padding: 10px 30px; 
+            border-radius: 20px; 
+            font-size: 16px;
+            cursor: pointer; 
+            transition: background-color 0.2s;
+            font-family: 'Times New Roman', Times, serif;
+            margin-top: 10px;
+        }
+
+        .submit-btn:hover { 
+            background-color: var(--btn-hover);
+        }
+
+        .message {
+            width: 360px;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        .error { 
+            background-color: #5c2626;
+            color: #ffcdd2; 
+            border: 1px solid #d32f2f;
+        }
+        
+        .success { 
+            background-color: #1c4427;
+            color: #c8e6c9; 
+            border: 1px solid #388e3c;
+        }
+
+        .link-login { 
+            margin-top: 25px; 
+            font-size: 13px; 
+            color: var(--text-muted);
+        }
+
+        .link-login a {
+            color: var(--text-color);
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .link-login a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Контейнеры для вывода сообщений об ошибках/успехе регистрации -->
+<div id="errorBox" class="message error" style="display:none;"></div>
+<div id="successBox" class="message success" style="display:none;"></div>
+
+<div class="login-container">
+    <h1>Sign up</h1>
+
+    <form id="registerForm">
+        <div class="input-group">
+            <input type="email" id="email" name="email" class="input-field" placeholder="Email..." required autofocus />
+        </div>
+
+        <div class="input-group">
+            <input type="text" id="name" name="name" class="input-field" placeholder="Name..." required minlength="2" />
+        </div>
+
+        <div class="input-group">
+            <input type="password" id="password" name="password" class="input-field" placeholder="Password..." required minlength="8" />
+            <span class="hint">Минимум 8 символов, одна заглавная буква и одна цифра</span>
+        </div>
+
+        <button type="submit" class="submit-btn">Register</button>
+    </form>
+
+    <div class="link-login">
+        Уже есть аккаунт? <a th:href="@{/login}">Войти</a>
+    </div>
+</div>
+
+<script>
+    const csrfToken  = document.querySelector('meta[name="_csrf"]').content;
+    const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+
+    const form       = document.getElementById('registerForm');
+    const errorBox   = document.getElementById('errorBox');
+    const successBox = document.getElementById('successBox');
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errorBox.style.display = 'none';
+        successBox.style.display = 'none';
+
+        const payload = {
+            email:    document.getElementById('email').value,
+            name:     document.getElementById('name').value,
+            password: document.getElementById('password').value
+        };
+
+        try {
+            const res = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    [csrfHeader]: csrfToken
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.status === 201) {
+                successBox.textContent = 'Аккаунт создан! Сейчас перенаправим на страницу входа…';
+                successBox.style.display = 'block';
+                setTimeout(() => window.location.href = '/login', 1000);
+                return;
+            }
+
+            if (res.status === 409) {
+                errorBox.textContent = 'Этот email уже зарегистрирован';
+                errorBox.style.display = 'block';
+                return;
+            }
+
+            if (res.status === 400) {
+                let msg = 'Проверьте правильность данных';
+                try {
+                    const body = await res.json();
+                    if (body.message) msg = body.message;
+                    else if (body.errors) msg = Object.values(body.errors).join(', ');
+                } catch (_) {}
+                errorBox.textContent = msg;
+                errorBox.style.display = 'block';
+                return;
+            }
+
+            errorBox.textContent = 'Ошибка: ' + res.status;
+            errorBox.style.display = 'block';
+
+        } catch (err) {
+            errorBox.textContent = 'Сетевая ошибка: ' + err.message;
+            errorBox.style.display = 'block';
+        }
+    });
+</script>
+
+</body>
+</html>

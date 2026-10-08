@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <title>Заметка</title>
+
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+
+    <style>
+        :root {
+            --bg-dark: #1b3322;
+            --panel-bg: #23442d;
+            --card-bg: #2a5c3a;
+            --input-bg: #cccccc;
+            --text-color: #ffffff;
+            --text-muted: #a0b0a0;
+            --btn-submit: #2a3d30;
+            --btn-hover: #344d3c;
+        }
+
+        body { 
+            font-family: Arial, sans-serif; 
+            background-color: var(--bg-dark);
+            color: var(--text-color);
+            margin: 0; 
+            padding: 40px 20px; 
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 600px;
+            background-color: var(--panel-bg);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            box-sizing: border-box;
+        }
+
+        .topbar { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 20px;
+        }
+
+        .topbar a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.2s;
+        }
+
+        .topbar a:hover {
+            color: var(--text-color);
+        }
+
+        h1 { 
+            margin: 10px 0; 
+            font-size: 28px;
+            font-weight: normal;
+        }
+
+        .meta { 
+            color: var(--text-muted); 
+            font-size: 13px; 
+            margin-bottom: 20px; 
+        }
+
+        .body { 
+            white-space: pre-wrap; 
+            line-height: 1.6; 
+            margin-bottom: 30px; 
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 15px;
+            font-size: 16px;
+        }
+
+        hr {
+            border: none;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            margin: 25px 0;
+        }
+
+        h3 {
+            font-weight: normal;
+            font-size: 20px;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+
+        label { 
+            display: block; 
+            margin-top: 15px; 
+            font-size: 14px; 
+            color: var(--text-muted); 
+        }
+
+        input[type=text], textarea, select {
+            width: 100%; 
+            padding: 12px; 
+            box-sizing: border-box; 
+            margin-top: 6px;
+            border: none;
+            border-radius: 10px;
+            background-color: var(--input-bg);
+            color: #111111;
+            font-size: 15px;
+            font-family: inherit;
+        }
+
+        textarea { 
+            min-height: 120px; 
+            resize: vertical;
+        }
+
+        select {
+            cursor: pointer;
+            appearance: none; /* Убираем дефолтную стрелочку браузера для красоты */
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://w3.org' width='10' height='10' viewBox='0 0 10 10'><path d='M0 3l5 5 5-5z' fill='%23333'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 30px;
+        }
+
+        .actions { 
+            margin-top: 25px; 
+            display: flex; 
+            gap: 10px; 
+        }
+
+        .actions button { 
+            background-color: var(--btn-submit);
+            color: var(--text-color);
+            border: none;
+            padding: 12px 30px; 
+            border-radius: 15px; 
+            font-size: 16px;
+            cursor: pointer; 
+            transition: background-color 0.2s;
+        }
+
+        .actions button:hover { 
+            background-color: var(--btn-hover);
+        }
+
+        #error { color: #ff6b6b; margin-top: 12px; font-size: 14px; }
+        #success { color: #69db7c; margin-top: 12px; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="topbar">
+        <div><a th:href="@{/tasks}">← К списку</a></div>
+    </div>
+
+    <h1 id="title">Загрузка…</h1>
+    <div class="meta">
+        Тип: <span id="type">?</span> ·
+        Создано: <span id="createdAt">?</span> ·
+        Изменено: <span id="updatedAt">?</span>
+    </div>
+
+    <div class="body" id="body"></div>
+
+    <hr/>
+
+    <h3>Редактировать</h3>
+
+    <form id="editForm">
+        <label for="name">Заголовок</label>
+        <input type="text" id="name" required />
+
+        <label for="bodyInput">Текст</label>
+        <textarea id="bodyInput"></textarea>
+
+        <label for="typeInput">Тип</label>
+        <select id="typeInput">
+            <option value="NORMAL">Обычная</option>
+            <option value="ARCHIVED">Архив</option>
+            <option value="TRASH">Корзина</option>
+        </select>
+
+        <div class="actions">
+            <button type="submit">Сохранить</button>
+        </div>
+
+        <div id="error"></div>
+        <div id="success"></div>
+    </form>
+</div>
+
+<script>
+    const csrfToken  = document.querySelector('meta[name="_csrf"]').content;
+    const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+
+    const pathParts = window.location.pathname.split('/');
+    const taskId = pathParts[pathParts.length - 1];
+
+    const errorBox   = document.getElementById('error');
+    const successBox = document.getElementById('success');
+
+    // ====== Загрузка через REST ======
+    async function loadTask() {
+        const res = await fetch('/api/task/' + taskId);
+
+        if (res.status === 404) {
+            document.getElementById('title').textContent = 'Заметка не найдена';
+            document.getElementById('editForm').style.display = 'none';
+            document.getElementById('body').style.display = 'none';
+            return;
+        }
+        if (!res.ok) {
+            errorBox.textContent = 'Ошибка загрузки: ' + res.status;
+            return;
+        }
+
+        const t = await res.json();
+
+        // Перевод типов для красивого отображения в мете
+        const typeLabels = { 'NORMAL': 'Обычная', 'ARCHIVED': 'Архив', 'TRASH': 'Корзина' };
+
+        document.getElementById('title').textContent = t.name;
+        document.getElementById('type').textContent = typeLabels[t.type] || t.type;
+        document.getElementById('createdAt').textContent = new Date(t.createdAt).toLocaleString('ru-RU');
+        document.getElementById('updatedAt').textContent = new Date(t.updatedAt).toLocaleString('ru-RU');
+        document.getElementById('body').textContent = t.body ?? '';
+
+        document.getElementById('name').value = t.name;
+        document.getElementById('bodyInput').value = t.body ?? '';
+        document.getElementById('typeInput').value = t.type;
+    }
+
+    // ====== Сохранение через REST ======
+    document.getElementById('editForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errorBox.textContent = '';
+        successBox.textContent = '';
+
+        const params = new URLSearchParams({
+            name: document.getElementById('name').value,
+            body: document.getElementById('bodyInput').value,
+            type: document.getElementById('typeInput').value
+        });
+
+        const res = await fetch('/api/update/' + taskId + '?' + params, {
+            method: 'PUT',
+            headers: { [csrfHeader]: csrfToken }
+        });
+
+        if (res.ok) {
+            successBox.textContent = 'Сохранено успешно';
+            loadTask();
+        } else {
+            errorBox.textContent = 'Не удалось сохранить: ' + res.status;
+        }
+    });
+
+    loadTask();
+</script>
+
+</body>
+</html>
