@@ -334,4 +334,94 @@
             
             // Выбор следующего целевого статуса при клике на чекбокс
             let nextStatus = 'TRASH';
+                if (currentType === 'TRASH') nextStatus = 'NORMAL'; // Из корзины восстанавливает в обычные
+            f (currentType === 'ARCHIVED') nextStatus = 'TRASH'; // Из архива отправляет в корзину
+card.innerHTML = <div class="checkbox-wrapper"> <input type="checkbox" class="action-checkbox" title="Изменить статус" data-id="${t.id}"> </div> <h3><a href="/task/${t.id}">${escapeHtml(t.name)}</a></h3> <p>${escapeHtml(t.body ?? '')}</p> <div class="card-meta"> ${new Date(t.createdAt).toLocaleDateString('ru-RU')} </div>;
+// Обработка логики чекбокса: при активации переносит заметку в соответствующий статус
+card.querySelector('.action-checkbox').addEventListener('change', async function() {
+if(this.checked) {
+await changeType(t, nextStatus);
+}
+});
+list.appendChild(card);
+});
+}
+// ====== Создание заметки ======
+async function submitCreateForm() {
+const nameInput = document.getElementById('name');
+const bodyInput = document.getElementById('body');
+if(!nameInput.value.trim()) {
+alert('Введите заголовок заметки');
+return;
+}
+const params = new URLSearchParams({ name: nameInput.value, body: bodyInput.value });
+const res = await fetch('/api/create?' + params, {
+method: 'POST',
+headers: { [csrfHeader]: csrfToken }
+});
+if (res.status === 201) {
+nameInput.value = '';
+bodyInput.value = '';
+document.getElementById('createBox').style.display = 'none';
+if (currentType !== 'NORMAL') {
+currentType = 'NORMAL';
+highlightTab();
+}
+loadTasks();
+} else {
+alert('Не удалось создать: ' + res.status);
+}
+}
+// ====== Перемещение заметки (Смена типа) ======
+async function changeType(task, newType) {
+const params = new URLSearchParams({
+name: task.name,
+body: task.body ?? '',
+type: newType
+});
+const res = await fetch('/api/update/' + task.id + '?' + params, {
+method: 'PUT',
+headers: { [csrfHeader]: csrfToken }
+});
+if (res.ok) loadTasks();
+else alert('Не удалось обновить статус: ' + res.status);
+}
+// ====== Полная очистка корзины ======
+document.getElementById('clearTrashBtn').addEventListener('click', async () => {
+if (!confirm('Очистить корзину полностью? Это удалит все заметки из корзины.')) return;
+const res = await fetch('/api/delete', {
+method: 'DELETE',
+headers: { [csrfHeader]: csrfToken }
+});
+if (res.status === 204) {
+loadTasks();
+alert('Корзина очищена');
+} else {
+alert('Не удалось очистить: ' + res.status);
+}
+});
+// ====== Логика переключения табов (панель инструментов) ======
+document.querySelectorAll('.toolbar .tool-btn').forEach(btn => {
+btn.addEventListener('click', () => {
+currentType = btn.dataset.type;
+highlightTab();
+loadTasks();
+});
+});
+function highlightTab() {
+document.querySelectorAll('.toolbar .tool-btn').forEach(b => {
+b.classList.toggle('active', b.dataset.type === currentType);
+});
+}
+// ====== Утилитарная функция экранирования текста ======
+function escapeHtml(s) {
+return String(s)
+.replaceAll('&', '&')
+.replaceAll('<', '<')
+.replaceAll('>', '>')
+.replaceAll('"', '"')
+.replaceAll("'", ''');
+}
+// Первоначальный старт загрузки данных
+loadTasks();
         }
